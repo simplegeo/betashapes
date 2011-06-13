@@ -9,22 +9,22 @@ SAMPLE_SIZE = 5
 MEDIAN_THRESHOLD = 5.0
 
 median_distance_cache = {}
-def median_distances(points, aggregate=numpy.median):
-    key = tuple(sorted(points))
+def median_distances(pts, aggregate=numpy.median):
+    key = tuple(sorted(pts))
     if key in median_distance_cache: return median_distance_cache[key]
-    median = Point((numpy.median([pt.x for pt in points]),
-                    numpy.median([pt.y for pt in points])))
+    median = (numpy.median([pt[0] for pt in pts]),
+              numpy.median([pt[1] for pt in pts]))
     distances = []
-    for pt in points:
-        dist = math.sqrt(((median.x-pt.x)*math.cos(median.y*math.pi/180.0))**2+(median.y-pt.y)**2)
+    for pt in pts:
+        dist = math.sqrt(((median[0]-pt[0])*math.cos(median[1]*math.pi/180.0))**2+(median[1]-pt[1])**2)
         distances.append((dist, pt))
 
     median_dist = aggregate([dist for dist, pt in distances])
     median_distance_cache[key] = (median_dist, distances)
     return (median_dist, distances)
 
-def mean_distances(points):
-    return median_distances(points, numpy.mean)
+def mean_distances(pts):
+    return median_distances(pts, numpy.mean)
 
 names = {}
 if len(sys.argv) > 1:
@@ -33,14 +33,14 @@ if len(sys.argv) > 1:
         names[int(place_id)] = name
 
 places = {}
-if False: #os.path.exists(sys.argv[2] + '.cache'):
+if os.path.exists(sys.argv[2] + '.cache'):
     print >>sys.stderr, "Reading from file cache..."
     places = pickle.load(file(sys.argv[2] + ".cache"))
 else:
     count = 0
     for line in file(sys.argv[2]):
         place_id, lon, lat = line.strip().split()
-        point = Point(float(lon), float(lat))
+        point = (float(lon), float(lat))
         pts = places.setdefault(int(place_id), set())
         pts.add(point)
         count += 1
@@ -60,17 +60,17 @@ else:
 
     print >>sys.stderr, "%d points discarded." % discarded
 
-"""
 if not os.path.exists(sys.argv[2] + '.cache'):
     print >>sys.stderr, "Caching points..."
     pickle.dump(places, file(sys.argv[2] + ".cache", "w"), -1)
-"""
 
 print >>sys.stderr, "Indexing..."
+points = []
 place_list = set()
 for place_id, pts in places.items():
-    for point in pts:
-        place_list.add((int(place_id), point.bounds, None))
+    for pt in pts:
+        place_list.add((len(points), pt+pt, None))
+        points.append((place_id, Point(pt)))
 index = Rtree(place_list)
 
 """
@@ -163,10 +163,10 @@ for polygon in rings:
     if polygon.is_empty: continue
     place_count = dict((place_id, 0) for place_id in places)
     prepared = prep(polygon)
-    #for item in index.intersection(polygon.bounds, objects=True):
-    for item in index.intersection(polygon.bounds, objects=True):
-        if prepared.intersects(Point(item.bbox[0:2])):
-            place_count[item.id] += 1
+    for item in index.intersection(polygon.bounds):
+        place_id, point = points[item]
+        if prepared.intersects(point):
+            place_count[place_id] += 1
     pt_count, place_id = max((c, i) for (i, c) in place_count.items())
     polys = polygons.setdefault(place_id, [])
     polys.append(polygon)
@@ -190,8 +190,9 @@ for place_id, multipolygon in polygons.items():
     polygon_count = [0] * len(multipolygon)
     for i, polygon in enumerate(multipolygon.geoms):
         prepared = prep(polygon)
-        for item in index.intersection(polygon.bounds, objects=True):
-            if item.id == place_id and prepared.intersects(Point(item.bbox[0:2])):
+        for item in index.intersection(polygon.bounds):
+            item_id, point = points[item]
+            if item_id == place_id and prepared.intersects(point):
                 polygon_count[i] += 1
     winner = max((c, i) for (i, c) in enumerate(polygon_count))[1]
     polygons[place_id] = multipolygon.geoms[winner]
@@ -208,11 +209,11 @@ while changed and orphans:
     place_count = dict((place_id, 0) for place_id in places)
     total_count = 0.0
     prepared = prep(orphan)
-    for item in index.intersection(orphan.bounds, objects=True):
-        if prepared.intersects(Point(item.bbox[0:2])): 
-                if filter(prepared.intersects, places[item.id]):
-                    place_count[item.id] += 1
-                    total_count += 1
+    for item in index.intersection(orphan.bounds):
+        item_id, point = points[item]
+        if prepared.intersects(point):
+            place_count[item_id] += 1
+            total_count += 1
     for place_id, ct in place_count.items():
         if total_count > 0  and float(ct)/total_count > 1/3.0:
             polygons[place_id] = polygons[place_id].union(orphan)
