@@ -26,24 +26,26 @@ def median_distances(pts, aggregate=numpy.median):
 def mean_distances(pts):
     return median_distances(pts, numpy.mean)
 
+name_file, point_file = sys.argv[1:3]
+
 places = {}
 names = {}
-if os.path.exists(sys.argv[2] + '.cache'):
-    print >>sys.stderr, "Reading from file cache..."
-    names, places = pickle.load(file(sys.argv[2] + ".cache"))
+if os.path.exists(point_file + '.cache'):
+    print >>sys.stderr, "Reading from %s cache..." % point_file
+    names, places = pickle.load(file(point_file + ".cache"))
 else:
     all_names = {}
     count = 0
-    for line in file(sys.argv[1]):
+    for line in file(name_file):
         place_id, name = line.strip().split(None, 1)
         all_names[int(place_id)] = name
         count += 1
         if count % 1000 == 0:
-            print >>sys.stderr, "\rRead %d names." % count,
-    print >>sys.stderr, "\rRead %d names." % count
+            print >>sys.stderr, "\rRead %d names from %s." % (count, name_file),
+    print >>sys.stderr, "\rRead %d names from %s." % (count, name_file)
 
     count = 0
-    for line in file(sys.argv[2]):
+    for line in file(point_file):
         place_id, lon, lat = line.strip().split()
         place_id = int(place_id)
         names[place_id] = all_names.get(place_id, "")
@@ -67,9 +69,9 @@ else:
 
     print >>sys.stderr, "%d points discarded." % discarded
 
-if not os.path.exists(sys.argv[2] + '.cache'):
+if not os.path.exists(point_file + '.cache'):
     print >>sys.stderr, "Caching points..."
-    pickle.dump((names, places), file(sys.argv[2] + ".cache", "w"), -1)
+    pickle.dump((names, places), file(point_file + ".cache", "w"), -1)
 
 print >>sys.stderr, "Indexing..."
 points = []
