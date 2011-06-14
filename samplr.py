@@ -26,22 +26,29 @@ def median_distances(pts, aggregate=numpy.median):
 def mean_distances(pts):
     return median_distances(pts, numpy.mean)
 
-names = {}
-if len(sys.argv) > 1:
-    for line in file(sys.argv[1]):
-        place_id, name = line.strip().split(None, 1)
-        names[int(place_id)] = name
-
 places = {}
+names = {}
 if os.path.exists(sys.argv[2] + '.cache'):
     print >>sys.stderr, "Reading from file cache..."
-    places = pickle.load(file(sys.argv[2] + ".cache"))
+    names, places = pickle.load(file(sys.argv[2] + ".cache"))
 else:
+    all_names = {}
+    count = 0
+    for line in file(sys.argv[1]):
+        place_id, name = line.strip().split(None, 1)
+        all_names[int(place_id)] = name
+        count += 1
+        if count % 1000 == 0:
+            print >>sys.stderr, "\rRead %d names." % count,
+    print >>sys.stderr, "\rRead %d names." % count
+
     count = 0
     for line in file(sys.argv[2]):
         place_id, lon, lat = line.strip().split()
+        place_id = int(place_id)
+        names[place_id] = all_names.get(place_id, "")
         point = (float(lon), float(lat))
-        pts = places.setdefault(int(place_id), set())
+        pts = places.setdefault(place_id, set())
         pts.add(point)
         count += 1
         if count % 1000 == 0:
@@ -62,7 +69,7 @@ else:
 
 if not os.path.exists(sys.argv[2] + '.cache'):
     print >>sys.stderr, "Caching points..."
-    pickle.dump(places, file(sys.argv[2] + ".cache", "w"), -1)
+    pickle.dump((names, places), file(sys.argv[2] + ".cache", "w"), -1)
 
 print >>sys.stderr, "Indexing..."
 points = []
@@ -135,11 +142,11 @@ for place_id, pts in places.items():
     for i in range(min(pts,SAMPLE_ITERATIONS)):
         multipoint = MultiPoint(random.sample(pts, min(SAMPLE_SIZE, len(pts))))
         hull = multipoint.convex_hull
-        if not hull.is_empty and hull.is_simple and not isinstance(hull,Point): hulls.append(hull)
+        if isinstance(hull, Polygon) and not hull.is_empty: hulls.append(hull)
     try:
         sample_hulls[place_id] = cascaded_union(hulls)
     except:
-        print >>sys.stderrm, hulls
+        print >>sys.stderr, hulls
         sys.exit()
     if hasattr(sample_hulls[place_id], "geoms"):
         sample_hulls[place_id] = cascaded_union([hull for hull in sample_hulls[place_id] if type(hull) is Polygon])
@@ -154,7 +161,8 @@ rings = list(polygonize(boundaries))
 
 for i, ring in enumerate(rings):
     print >>sys.stderr, "\rBuffering %d of %d polygons..." % (i, len(rings)),
-    rings[i] = ring.buffer(0.001).buffer(-0.001)
+    size = math.sqrt(ring.area)*0.1
+    rings[i] = ring.buffer(size)
 print >>sys.stderr, "Done."
 
 polygons = {}
@@ -199,6 +207,7 @@ for place_id, multipolygon in polygons.items():
     orphans.extend(p for i, p in enumerate(multipolygon.geoms) if i != winner)
 print >>sys.stderr, "Done."
 
+orphans = []
 count = 0
 changed = True
 while changed and orphans:
