@@ -1,8 +1,8 @@
 import Flickr.API
 import json, time, sys
 
-FLICKR_KEY    = "250312a2c0a1a34bae889d5a6b5c07e0"
-FLICKR_SECRET = "ff91efe4924c0461"
+FLICKR_KEY    = ""
+FLICKR_SECRET = ""
 
 START_PAGE = 1
 END_PAGE = 10
