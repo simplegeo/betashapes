@@ -194,9 +194,10 @@ for origin_id, orphan in orphans:
 print >>sys.stderr, "Buffering polygons."
 for place_id, polygon in polygons.items():
     if type(polygon) is Polygon:
-        polygons[place_id] = Polygon(polygon.exterior.coords).buffer(0)
+        polygon = Polygon(polygon.exterior.coords)
     else:
-        polygons[place_id] = MultiPolygon([p.exterior.coords for p in polygon.geoms]).buffer(0)
+        polygon = MultiPolygon([Polygon(p.exterior.coords)for p in polygon.geoms])
+    polygons[place_id] = polygon.buffer(0)
  
 print >>sys.stderr, "Writing output."
 features = []
