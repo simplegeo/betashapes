@@ -9,49 +9,51 @@ import copy
 #for each of the children that are local admins, get all their children that are local admins or suburbs
 #repeat until have list of descendents that have no children
 #print list as name, woe_id
+leaftypes = ('LocalAdmin',"Suburb")
+
+#owriter = csv.writer(sys.stdout)
+#owriter.writerow(["parent_id","name","type","woe_id"])
 
 def main():
-    woeid = sys.argv[1]
+    for woeid in sys.argv[1:]:
+        print >>sys.stderr, woeid,
 
-    leaftype = "Suburb"
-    if len(sys.argv) > 2:
-        leaftype = "'%s'" % sys.argv[2]
+        childq = """select * from woe_places
+                where parent_id = %s
+                and placetype in ('County','LocalAdmin','Suburb')"""
 
-    outfile = "leaves_%s.csv" % woeid
+        conn_string = "dbname='hood'"
+        # get a connection, if a connect cannot be made an exception will be raised here
+        conn = psycopg2.connect(conn_string)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-    childq = """select * from woe_places
-            where parent_id = %s
-            and placetype in ('County','LocalAdmin','Suburb')"""
+        search = set([woeid])
+        leaves = set()
+        names = {}
+        types = {}
+        while len(search) > 0:
+            print >>sys.stderr, ".",
+            curr_search = copy.copy(search)
+            for woe in curr_search:
+                search.remove(woe)
+                qry = childq % woe
+                cursor.execute(qry)
+                if cursor.rowcount == 0:
+                    if woe not in types:
+                        break
+                    if types[woe] in leaftypes:
+                        leaves.add((woeid,names[woe],types[woe],woe))
+                for line in cursor:
+                    names[line['woe_id']] = line['name']
+                    types[line['woe_id']] = line['placetype']
+                    search.add(line['woe_id'])
 
-    conn_string = "dbname='hood'"
-    # get a connection, if a connect cannot be made an exception will be raised here
-    conn = psycopg2.connect(conn_string)
-    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        conn.close()
+        print >>sys.stderr, ""
 
-    search = set([woeid])
-    leaves = set()
-    names = {}
-    types = {}
-    while len(search) > 0:
-        curr_search = copy.copy(search)
-        for woe in curr_search:
-            search.remove(woe)
-            qry = childq % (woe, leaftypes)
-            cursor.execute(qry)
-            if cursor.rowcount == 0:
-                if types[woe] == leaftype:
-                    leaves.add((names[woe],types[woe],woe))
-            for line in cursor:
-                names[line['woe_id']] = line['name']
-                types[line['woe_id']] = line['placetype']
-                search.add(line['woe_id'])
-
-    conn.close()
-
-    owriter = csv.writer(open(outfile, 'w'))
-    owriter.writerow(["name","type","woe_id"])
-    for leaf in leaves:
-        owriter.writerow(leaf)
+        for leaf in leaves:
+            #owriter.writerow(leaf)
+            print "\t".join(map(str,leaf))
 
 if __name__ == "__main__":
     sys.exit(main())
