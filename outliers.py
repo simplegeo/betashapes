@@ -22,7 +22,7 @@ def median_distances(pts, aggregate=numpy.median):
 def mean_distances(pts):
     return median_distances(pts, numpy.mean)
 
-def main(point_file):
+def load_points(point_file):
     places = {}
     count = 0
     for line in file(point_file):
@@ -35,21 +35,36 @@ def main(point_file):
         if count % 1000 == 0:
             print >>sys.stderr, "\rRead %d points in %d places." % (count, len(places)),
     print >>sys.stderr, "\rRead %d points in %d places." % (count, len(places))
+    return places
 
+def discard_outliers(places, threshold=MEDIAN_THRESHOLD):
     count = 0
     discarded = 0
-    bbox = [180, 90, -180, -90]
+    result = {}
     for place_id, pts in places.items():
         count += 1
         print >>sys.stderr, "\rComputing outliers for %d of %d places..." % (count, len(places)),
         median_dist, distances = median_distances(pts)
-        keep = [pt for dist, pt in distances if dist < median_dist * MEDIAN_THRESHOLD]
+        keep = [pt for dist, pt in distances if dist < median_dist * threshold]
         discarded += len(pts) - len(keep)
-        for pt in keep:
+        result[place_id] = keep
+    print >>sys.stderr, "%d points discarded." % discarded
+    return result
+
+def get_bbox_for_points(places):
+    bbox = [180, 90, -180, -90]
+    for pid, pts in places.items():
+        for pt in pts:
             for i in range(4):
                 bbox[i] = min(bbox[i], pt[i%2]) if i<2 else max(bbox[i], pt[i%2])
+    return bbox
 
-    print >>sys.stderr, "%d points discarded." % discarded
+def main(filename):
+    places = load_points(filename)
+    places = discard_outliers(places)
+    bbox = get_bbox_for_points(places)
     print ",".join(map(str, bbox))
+    
+if __name__ == "__main__":
+    main(sys.argv[1])
 
-main(sys.argv[1])
