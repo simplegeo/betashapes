@@ -26,7 +26,8 @@ def load_points(point_file):
     places = {}
     count = 0
     for line in file(point_file):
-        place_id, lon, lat = line.strip().split()
+        data = line.strip().split()
+        place_id, lon, lat = data if len(data) == 3 else data[1:]
         place_id = int(place_id)
         point = (float(lon), float(lat))
         pts = places.setdefault(place_id, set())

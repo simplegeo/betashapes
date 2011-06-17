@@ -113,6 +113,7 @@ class OsmApi:
         
         # Get API
         self._api = api
+        self._xapi = True if "xapi" in api else False
 
         # Get created_by
         if not appid:
@@ -481,9 +482,15 @@ class OsmApi:
     # Other                                                               #
     #######################################################################
 
-    def Map(self, min_lon, min_lat, max_lon, max_lat):
+    def Map(self, min_lon, min_lat, max_lon, max_lat, **kwargs):
         """ Download data in bounding box. Returns list of dict {type: node|way|relation, data: {}}. """
-        uri = "/api/0.6/map?bbox=%f,%f,%f,%f"%(min_lon, min_lat, max_lon, max_lat)
+        if False: #self._xapi:
+            kwargs["bbox"] = "bbox=%f,%f,%f,%f" % (min_lon, min_lat, max_lon, max_lat)
+            args = ["[%s=%s]" % item for item in kwargs.items()]
+            uri = "/api/0.6/*" + "".join(args)
+        else:
+            uri = "/api/0.6/map?bbox=%f,%f,%f,%f"%(min_lon, min_lat, max_lon, max_lat)
+
         data = self._get(uri)
         return self.ParseOsm(data)
 

@@ -1,0 +1,13 @@
+
+NAME=$1
+WOEID=$2
+DBNAME=sderle
+grep ^$WOEID data/suburbs_wanted.csv | cut -f4 | xargs python geocrawlr.py >data/photos_$WOEID.txt
+sed -e 's/WOEID/$WOEID/g; s/DBNAME/$DBNAME/g' <<End | grass6 /home/sderle/Global/PERMANENT
+v.in.ogr -e --o --v dsn="PG:dbname=DBNAME" layer=osm_ways output=blocks_WOEID \
+                    type=boundary \
+                    spatial=`python outliers.py data/photos_$WOEID.txt` \
+                    where='highway is not null or waterway is not null'
+v.out.ogr in=blocks_WOEID dsn=data/blocks_WOEID.json format=GeoJSON type=area
+End
+python blockr.py data/names.txt data/blocks_$WOEID.json data/photos_$WOEID.json > data/$NAME.json
