@@ -6,7 +6,8 @@ from outliers import load_points, discard_outliers
 import sys, random, json, numpy, math, pickle, os, geojson
 
 SAMPLE_SIZE = 20
-SCALE_FACTOR = 111111.0
+SCALE_FACTOR = 111111.0 # meters per degree latitude
+ACTION_THRESHOLD = 2.0/math.sqrt(1000.0) # 1 point closer than 1km
 name_file, line_file, point_file = sys.argv[1:4]
 
 places = {}
@@ -67,11 +68,19 @@ print >>sys.stderr, "Done."
 
 def score_block(polygon):
     centroid = polygon.centroid
+    prepared = prep(polygon)
     score = {}
-    for item in index.nearest((centroid.x, centroid.y), SAMPLE_SIZE):
+    outside_samples = 0
+    for item in index.nearest((centroid.x, centroid.y)):
         place_id, point = points[item]
         score.setdefault(place_id, 0.0)
-        score[place_id] += 1.0 / math.sqrt(max(polygon.distance(point)*SCALE_FACTOR, 1.0))
+        #if prepared.contains(point):
+        #    score[place_id] += 1.0
+        #else:
+        if True:
+            score[place_id] += 1.0 / math.sqrt(max(polygon.distance(point)*SCALE_FACTOR, 1.0))
+            outside_samples += 1
+        if outside_samples > SAMPLE_SIZE: break
     return list(reversed(sorted((sc, place_id) for place_id, sc in score.items())))
 
 count = 0
@@ -79,15 +88,19 @@ assigned_blocks = {}
 for polygon in blocks:
     count += 1
     print >>sys.stderr, "\rScoring %d of %d blocks..." % (count, len(blocks)),
-    if polygon.is_empty: continue
     if not polygon.is_valid:
-        polygon = polygon.buffer(0)
+        try:
+            polygon = polygon.buffer(0)
+        except:
+            pass
     if not polygon.is_valid:
         continue
+    if polygon.is_empty: continue
     scores = score_block(polygon)
-    winner = scores[0][1]
-    assigned_blocks.setdefault(winner, [])
-    assigned_blocks[winner].append(polygon)
+    best, winner = scores[0]
+    if best > ACTION_THRESHOLD:
+        assigned_blocks.setdefault(winner, [])
+        assigned_blocks[winner].append(polygon)
 print >>sys.stderr, "Done."
 
 polygons = {}
