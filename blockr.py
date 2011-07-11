@@ -71,16 +71,14 @@ def score_block(polygon):
     prepared = prep(polygon)
     score = {}
     outside_samples = 0
-    for item in index.nearest((centroid.x, centroid.y)):
+    for item in index.nearest((centroid.x, centroid.y), num_results=SAMPLE_SIZE):
         place_id, point = points[item]
         score.setdefault(place_id, 0.0)
         #if prepared.contains(point):
         #    score[place_id] += 1.0
         #else:
-        if True:
-            score[place_id] += 1.0 / math.sqrt(max(polygon.distance(point)*SCALE_FACTOR, 1.0))
-            outside_samples += 1
-        if outside_samples > SAMPLE_SIZE: break
+        score[place_id] += 1.0 / math.sqrt(max(polygon.distance(point)*SCALE_FACTOR, 1.0))
+        outside_samples += 1
     return list(reversed(sorted((sc, place_id) for place_id, sc in score.items())))
 
 count = 0
