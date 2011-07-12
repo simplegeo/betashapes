@@ -3,15 +3,14 @@ from shapely.ops import cascaded_union, polygonize
 from shapely.prepared import prep
 from rtree import Rtree
 from outliers import load_points, discard_outliers
-from pushpin.store import StoredPreparedIndex
 import sys, json, math, pickle, os, geojson
 
 SAMPLE_SIZE = 20
 SCALE_FACTOR = 111111.0 # meters per degree latitude
-ACTION_THRESHOLD = 2.0/math.sqrt(1000.0) # 1 point closer than 1km
+#ACTION_THRESHOLD = 2.0/math.sqrt(1000.0) # 1 point closer than 1km
+ACTION_THRESHOLD = 20.0/math.sqrt(1000.0) # 1 point closer than 1km
+AREA_BOUND = 0.0002
 name_file, line_file, point_file = sys.argv[1:4]
-
-pushpinindex = StoredPreparedIndex("/mnt/pushpin/context", mode="r")
 
 places = {}
 names = {}
@@ -97,6 +96,8 @@ for polygon in blocks:
     if not polygon.is_valid:
         continue
     if polygon.is_empty: continue
+    if polygon.area > AREA_BOUND: continue
+
     scores = score_block(polygon)
     best, winner = scores[0]
     if best > ACTION_THRESHOLD:
@@ -165,34 +166,6 @@ print >>sys.stderr, "Returning remaining orphans to original places."
 for origin_id, orphan in orphans:
     if orphan.intersects(polygons[origin_id]):
         polygons[origin_id] = polygons[origin_id].union(orphan)
-
-print >>sys.stderr, "Clipping polygons to urban area."
-xmin, ymin, xmax, ymax = index.bounds
-xmid = (xmin+xmax)/2
-ymid = (ymin+ymax)/2
-context = pushpinindex.contains(xmid,ymid)
-urbanarea = None
-for feature in context:
-    if feature.attrs['category'] == 'Urban Area':
-        print >>sys.stderr, "Found urban area %s" % (feature.attrs['name'])
-        urbanarea = feature.geometry
-        break
-if urbanarea is None:
-    print >>sys.stderr, "Didn't find an urban area for pt %s %s, not clipping afterall" % (xmid, ymid)
-else:
-    if type(urbanarea) is Polygon:
-        urbanarea = Polygon(urbanarea.exterior.coords)
-    else:
-        urbanarea = MultiPolygon([Polygon(p.exterior.coords)for p in urbanarea.geoms])
-    urbanarea = urbanarea.buffer(0.001)
-    for place_id, polygon in polygons.items():
-        clipped = urbanarea.intersection(polygon)
-        if clipped.is_empty:
-            del polygons[place_id]
-            print >>sys.stderr, "Place %s is not in the urban area" % (place_id)
-        else:
-            polygons[place_id] = clipped  
-
 
 print >>sys.stderr, "Buffering polygons."
 for place_id, polygon in polygons.items():
