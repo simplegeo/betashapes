@@ -64,8 +64,9 @@ def main(filename):
     places = load_points(filename)
     places = discard_outliers(places)
     bbox = get_bbox_for_points(places)
-    print ",".join(map(str, bbox))
-    
+    #print ",".join(map(str, bbox))
+    print "%s %s, %s %s" % (bbox[0], bbox[1], bbox[2], bbox[3])
+
 if __name__ == "__main__":
     main(sys.argv[1])
 
