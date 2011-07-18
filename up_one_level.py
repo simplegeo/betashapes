@@ -1,6 +1,6 @@
 from shapely.geometry import Polygon, MultiPolygon, shape
 from shapely.ops import cascaded_union
-import sys, json, geojson
+import sys, json
 import psycopg2
 import psycopg2.extras
 
@@ -12,11 +12,11 @@ import psycopg2.extras
 
 town, townwoeid = sys.argv[1:3]
 
-json_file = "data/%s.geojson" % town
+json_file = "data/%s.json" % town
 new_json_file = "data/%s_stems.geojson" % town
 
 infh = open(json_file, 'r')
-injson = geojson.loads(infh.next())
+injson = json.loads(infh.next())
 nbhds = {}
 
 print >>sys.stderr, "Reading in nbhds."
