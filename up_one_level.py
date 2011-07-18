@@ -13,7 +13,6 @@ import psycopg2.extras
 town, townwoeid = sys.argv[1:3]
 
 json_file = "data/%s.json" % town
-new_json_file = "data/%s_stems.geojson" % town
 
 infh = open(json_file, 'r')
 injson = json.loads(infh.next())
@@ -64,14 +63,14 @@ for parent in family.keys():
 
 
 print >>sys.stderr, "Buffering stems."
-for parent, feature in nbhds.items():
+for parent, feature in family.items():
     polygon = feature['geom']
     #print >>sys.stderr, "\r%s has shape of type %s" %(place_id, type(polygon))
     if type(polygon) is Polygon:
         polygon = Polygon(polygon.exterior.coords)
     else:
         polygon = MultiPolygon([Polygon(p.exterior.coords)for p in polygon.geoms])
-    nbhds[parent]['geom'] = polygon.buffer(0)
+    family[parent]['geom'] = polygon.buffer(0)
  
 print >>sys.stderr, "Writing output."
 features = []
