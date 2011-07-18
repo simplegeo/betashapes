@@ -1,13 +1,15 @@
-from shapely.geometry import Point, MultiPoint, Polygon, MultiPolygon, asShape
+from shapely.geometry import Point, Polygon, MultiPolygon, asShape
 from shapely.ops import cascaded_union, polygonize
 from shapely.prepared import prep
 from rtree import Rtree
 from outliers import load_points, discard_outliers
-import sys, random, json, numpy, math, pickle, os, geojson
+import sys, json, math, pickle, os, geojson
 
 SAMPLE_SIZE = 20
 SCALE_FACTOR = 111111.0 # meters per degree latitude
-ACTION_THRESHOLD = 2.0/math.sqrt(1000.0) # 1 point closer than 1km
+#ACTION_THRESHOLD = 2.0/math.sqrt(1000.0) # 1 point closer than 1km
+ACTION_THRESHOLD = 20.0/math.sqrt(1000.0) # 1 point closer than 1km
+AREA_BOUND = 0.0002
 name_file, line_file, point_file = sys.argv[1:4]
 
 places = {}
@@ -68,19 +70,17 @@ print >>sys.stderr, "Done."
 
 def score_block(polygon):
     centroid = polygon.centroid
-    prepared = prep(polygon)
+    #prepared = prep(polygon)
     score = {}
     outside_samples = 0
-    for item in index.nearest((centroid.x, centroid.y)):
+    for item in index.nearest((centroid.x, centroid.y), num_results=SAMPLE_SIZE):
         place_id, point = points[item]
         score.setdefault(place_id, 0.0)
         #if prepared.contains(point):
         #    score[place_id] += 1.0
         #else:
-        if True:
-            score[place_id] += 1.0 / math.sqrt(max(polygon.distance(point)*SCALE_FACTOR, 1.0))
-            outside_samples += 1
-        if outside_samples > SAMPLE_SIZE: break
+        score[place_id] += 1.0 / math.sqrt(max(polygon.distance(point)*SCALE_FACTOR, 1.0))
+        outside_samples += 1
     return list(reversed(sorted((sc, place_id) for place_id, sc in score.items())))
 
 count = 0
@@ -96,6 +96,8 @@ for polygon in blocks:
     if not polygon.is_valid:
         continue
     if polygon.is_empty: continue
+    if polygon.area > AREA_BOUND: continue
+
     scores = score_block(polygon)
     best, winner = scores[0]
     if best > ACTION_THRESHOLD:
