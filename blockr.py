@@ -9,7 +9,9 @@ SAMPLE_SIZE = 20
 SCALE_FACTOR = 111111.0 # meters per degree latitude
 #ACTION_THRESHOLD = 2.0/math.sqrt(1000.0) # 1 point closer than 1km
 ACTION_THRESHOLD = 20.0/math.sqrt(1000.0) # 1 point closer than 1km
-AREA_BOUND = 0.0002
+AREA_BOUND = 0.002
+TARGET_ASSIGN_LEVEL = 0.75
+
 name_file, line_file, point_file = sys.argv[1:4]
 
 places = {}
@@ -85,12 +87,15 @@ def score_block(polygon):
 
 count = 0
 assigned_blocks = {}
-for polygon in blocks:
-    count += 1
-    print >>sys.stderr, "\rScoring %d of %d blocks..." % (count, len(blocks)),
+assigned_ct = 0
+unassigned = {} #keyed on the polygon's index in blocks
+for count in range(len(blocks)):
+    polygon = blocks[count]
+    print >>sys.stderr, "\rScoring %d of %d blocks..." % ((count+1), len(blocks)),
     if not polygon.is_valid:
         try:
             polygon = polygon.buffer(0)
+            blocks[count] = polygon
         except:
             pass
     if not polygon.is_valid:
@@ -101,9 +106,28 @@ for polygon in blocks:
     scores = score_block(polygon)
     best, winner = scores[0]
     if best > ACTION_THRESHOLD:
+        assigned_ct += 1
         assigned_blocks.setdefault(winner, [])
         assigned_blocks[winner].append(polygon)
-print >>sys.stderr, "Done."
+    else:
+        # if the block wasn't assigned hang onto the info about the winning nbhd
+        unassigned[count] = (best, winner)
+print >>sys.stderr, "Done, assigned %d of %d blocks" % (assigned_ct, len(blocks))
+
+new_threshold = ACTION_THRESHOLD
+while float(assigned_ct)/len(blocks) < TARGET_ASSIGN_LEVEL and len(unassigned) > 0:
+    new_threshold -= 0.1
+    print >>sys.stderr, "\rDropping threshold to %f1.3... " % new_threshold
+    for blockindex in unassigned.keys():
+        best, winner = unassigned[blockindex]
+        #if blocks[blockindex].is_empty: del(unassigned[blockindex])
+        if best > new_threshold:
+            assigned_ct += 1
+            assigned_blocks.setdefault(winner, [])
+            assigned_blocks[winner].append(blocks[blockindex])
+            del unassigned[blockindex]
+    print >>sys.stderr, "Done, assigned %d of %d blocks" % (assigned_ct, len(blocks))
+    
 
 polygons = {}
 count = 0
