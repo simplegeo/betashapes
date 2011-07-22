@@ -224,8 +224,8 @@ while holes:
                 #nbhds[place_id] = hole
                 #changed = True
                 continue
-            elif hole.intersects(polygons[place_id]['shape']):
-                polygons[place_id]['shape'] = polygons[place_id]['shape'].union(hole)
+            elif hole.intersects(polygons[place_id]):
+                polygons[place_id] = polygons[place_id].union(hole)
                 changed = True
             if changed:
                 break
@@ -244,7 +244,11 @@ for place_id, polygon in polygons.items():
     if type(polygon) is Polygon:
         polygon = Polygon(polygon.exterior.coords)
     else:
-        polygon = MultiPolygon([Polygon(p.exterior.coords)for p in polygon.geoms])
+        bits = []
+        for p in polygon.geoms:
+            if type(p) is Polygon:
+                bits.append(Polygon(p.exterior.coords))
+        polygon = MultiPolygon(bits)
     polygons[place_id] = polygon.buffer(0)
  
 print >>sys.stderr, "Writing output."
