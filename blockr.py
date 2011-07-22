@@ -198,15 +198,20 @@ city = cascaded_union(polygons.values())
 
 #pull out any holes in the resulting Polygon/Multipolygon
 if type(city) is Polygon:
-   over = [city]
+    over = [city]
+    city_edges = [LinearRing(city.exterior.coords)]
 elif type(city) is MultiPolygon:
     over = city.geoms
+    city_edges = [LinearRing(p.exterior.coords) for p in city.geoms]
 else:
     print >>sys.stderr, "\rcity is of type %s, wtf." % (type(city))
 
 holes = []
 for poly in over:
     holes.extend((Polygon(LinearRing(interior.coords)) for interior in poly.interiors))
+print >>sys.stderr, "num holes %d" % len(holes)
+holes = [hole for hole in holes if max([int(hole.intersects(edge)) for edge in city_edges]) == 0]
+print >>sys.stderr, "num holes %d" % len(holes)
 
 count = 0
 total = len(holes)
