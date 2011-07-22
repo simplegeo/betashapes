@@ -1,4 +1,5 @@
 from shapely.geometry import Point, Polygon, MultiPolygon, asShape
+from shapely.geometry.polygon import LinearRing
 from shapely.ops import cascaded_union, polygonize
 from shapely.prepared import prep
 from rtree import Rtree
@@ -190,6 +191,53 @@ print >>sys.stderr, "Returning remaining orphans to original places."
 for origin_id, orphan in orphans:
     if orphan.intersects(polygons[origin_id]):
         polygons[origin_id] = polygons[origin_id].union(orphan)
+
+print >>sys.stderr, "Try to assign the holes to neighboring neighborhoods."
+#merge the nbhds
+city = cascaded_union(polygons.values())
+
+#pull out any holes in the resulting Polygon/Multipolygon
+if type(city) is Polygon:
+   over = [city]
+elif type(city) is MultiPolygon:
+    over = city.geoms
+else:
+    print >>sys.stderr, "\rcity is of type %s, wtf." % (type(city))
+
+holes = []
+for poly in over:
+    holes.extend((Polygon(LinearRing(interior.coords)) for interior in poly.interiors))
+
+count = 0
+total = len(holes)
+retries = 0
+unassigned = None
+while holes:
+    unassigned = []
+    for hole in holes:
+        count += 1
+        changed = False
+        print >>sys.stderr, "\rReassigning %d of %d holes..." % (count-retries, total),
+        for score, place_id in score_block(hole):
+            if place_id not in polygons:
+                # Turns out we just wind up assigning tiny, inappropriate places
+                #nbhds[place_id] = hole
+                #changed = True
+                continue
+            elif hole.intersects(polygons[place_id]['shape']):
+                polygons[place_id]['shape'] = polygons[place_id]['shape'].union(hole)
+                changed = True
+            if changed:
+                break
+        if not changed:
+            unassigned.append(hole)
+            retries += 1
+    if len(unassigned) == len(holes):
+        # give up
+        break
+    holes = unassigned
+print >>sys.stderr, "%d retried, %d unassigned." % (retries, len(unassigned))
+
 
 print >>sys.stderr, "Buffering polygons."
 for place_id, polygon in polygons.items():
