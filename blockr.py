@@ -10,7 +10,7 @@ SAMPLE_SIZE = 20
 SCALE_FACTOR = 111111.0 # meters per degree latitude
 #ACTION_THRESHOLD = 2.0/math.sqrt(1000.0) # 1 point closer than 1km
 ACTION_THRESHOLD = 20.0/math.sqrt(1000.0) # 1 point closer than 1km
-AREA_BOUND = 0.002
+AREA_BOUND = 0.001
 TARGET_ASSIGN_LEVEL = 0.75
 
 name_file, line_file, point_file = sys.argv[1:4]
@@ -199,19 +199,14 @@ city = cascaded_union(polygons.values())
 #pull out any holes in the resulting Polygon/Multipolygon
 if type(city) is Polygon:
     over = [city]
-    city_edges = [LinearRing(city.exterior.coords)]
 elif type(city) is MultiPolygon:
     over = city.geoms
-    city_edges = [LinearRing(p.exterior.coords) for p in city.geoms]
 else:
     print >>sys.stderr, "\rcity is of type %s, wtf." % (type(city))
 
 holes = []
 for poly in over:
     holes.extend((Polygon(LinearRing(interior.coords)) for interior in poly.interiors))
-print >>sys.stderr, "num holes %d" % len(holes)
-holes = [hole for hole in holes if max([int(hole.intersects(edge)) for edge in city_edges]) == 0]
-print >>sys.stderr, "num holes %d" % len(holes)
 
 count = 0
 total = len(holes)
@@ -243,7 +238,6 @@ while holes:
     holes = unassigned
 print >>sys.stderr, "%d retried, %d unassigned." % (retries, len(unassigned))
 
-
 print >>sys.stderr, "Buffering polygons."
 for place_id, polygon in polygons.items():
     if type(polygon) is Polygon:
@@ -256,6 +250,7 @@ for place_id, polygon in polygons.items():
         polygon = MultiPolygon(bits)
     polygons[place_id] = polygon.buffer(0)
  
+
 print >>sys.stderr, "Writing output."
 features = []
 for place_id, poly in polygons.items():
