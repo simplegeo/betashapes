@@ -1,8 +1,8 @@
 import Flickr.API
-import json, time, sys
+import json, time, sys, os
 
-FLICKR_KEY    = ""
-FLICKR_SECRET = ""
+FLICKR_KEY    = os.environ["FLICKR_KEY"]
+FLICKR_SECRET = os.environ["FLICKR_SECRET"]
 
 START_PAGE = 1
 END_PAGE = 10
@@ -19,7 +19,7 @@ for woe_id in map(int, sys.argv[1:]):
                     method="flickr.photos.search",
                     format="json", 
                     nojsoncallback=1,
-                    #sort="interestingness-desc",
+                    sort="interestingness-desc",
                     page=page,
                     woe_id=woe_id,
                     extras="geo",
@@ -32,9 +32,10 @@ for woe_id in map(int, sys.argv[1:]):
                 response = api.execute_request(request).read()
             except Exception, e:
                 print >>sys.stderr, "Retrying due to:", e
-        print >>sys.stderr, "%.1fs elapsed." % (time.time()-start)
         try:
-            result = json.loads(response)["photos"]
+            result = json.loads(response)
+            result = result["photos"]
+            print >>sys.stderr, "%d results, %.1fs elapsed." % (len(result["photo"]),time.time()-start)
             for item in result["photo"]:
                 try:
                     print "\t".join(str(item[k]) for k in ("id","woeid","longitude","latitude"))
@@ -42,6 +43,6 @@ for woe_id in map(int, sys.argv[1:]):
                     print >>sys.stderr, e
             total_pages = min(int(result["pages"]), END_PAGE)
             #time.sleep(1.0)
-        except:
-            pass
+        except Exception, e:
+            print >>sys.stderr, e
         page += 1
