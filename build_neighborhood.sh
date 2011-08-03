@@ -6,14 +6,14 @@ DBPORT=5433
 GRASS_LOCATION=/mnt/places/melissa/grass/Global/PERMANENT
 export GRASS_BATCH_JOB=$GRASS_LOCATION/neighborhood.$$
 
-mkdir -p data
-if [ ! -r data/names.txt ]; then
-    echo "data/names.txt (tab separated file mapping woe_id to name) is missing"
+if [ ! -r data/names.txt -o ! -r data/suburbs.txt ]; then
+    echo "data/names.txt (tab separated file mapping woe_id to name) is missing, or"
+    echo "data/suburbs.txt (tab separated file mapping parent_id, name, type, woe_id) is missing"
     exit 1
 fi
 
 if [ ! -r data/photos_$WOEID.txt ]; then
-    grep ^$WOEID data/suburbs_wanted.csv | cut -f4 | xargs python geocrawlr.py >data/photos_$WOEID.txt
+    grep ^$WOEID data/suburbs.txt | cut -f4 | xargs python geocrawlr.py >data/photos_$WOEID.txt
 fi
 
 BBOX=`python outliers.py data/photos_$WOEID.txt`
