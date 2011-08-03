@@ -1,4 +1,5 @@
 from shapely.geometry import Point, Polygon, MultiPolygon, asShape
+from shapely.geometry.polygon import LinearRing
 from shapely.ops import cascaded_union, polygonize
 from shapely.prepared import prep
 from rtree import Rtree
@@ -9,7 +10,9 @@ SAMPLE_SIZE = 20
 SCALE_FACTOR = 111111.0 # meters per degree latitude
 #ACTION_THRESHOLD = 2.0/math.sqrt(1000.0) # 1 point closer than 1km
 ACTION_THRESHOLD = 20.0/math.sqrt(1000.0) # 1 point closer than 1km
-AREA_BOUND = 0.0002
+AREA_BOUND = 0.001
+TARGET_ASSIGN_LEVEL = 0.75
+
 name_file, line_file, point_file = sys.argv[1:4]
 
 places = {}
@@ -85,12 +88,15 @@ def score_block(polygon):
 
 count = 0
 assigned_blocks = {}
-for polygon in blocks:
-    count += 1
-    print >>sys.stderr, "\rScoring %d of %d blocks..." % (count, len(blocks)),
+assigned_ct = 0
+unassigned = {} #keyed on the polygon's index in blocks
+for count in range(len(blocks)):
+    polygon = blocks[count]
+    print >>sys.stderr, "\rScoring %d of %d blocks..." % ((count+1), len(blocks)),
     if not polygon.is_valid:
         try:
             polygon = polygon.buffer(0)
+            blocks[count] = polygon
         except:
             pass
     if not polygon.is_valid:
@@ -101,9 +107,28 @@ for polygon in blocks:
     scores = score_block(polygon)
     best, winner = scores[0]
     if best > ACTION_THRESHOLD:
+        assigned_ct += 1
         assigned_blocks.setdefault(winner, [])
         assigned_blocks[winner].append(polygon)
-print >>sys.stderr, "Done."
+    else:
+        # if the block wasn't assigned hang onto the info about the winning nbhd
+        unassigned[count] = (best, winner)
+print >>sys.stderr, "Done, assigned %d of %d blocks" % (assigned_ct, len(blocks))
+
+new_threshold = ACTION_THRESHOLD
+while float(assigned_ct)/len(blocks) < TARGET_ASSIGN_LEVEL and len(unassigned) > 0:
+    new_threshold -= 0.1
+    print >>sys.stderr, "\rDropping threshold to %f1.3... " % new_threshold
+    for blockindex in unassigned.keys():
+        best, winner = unassigned[blockindex]
+        #if blocks[blockindex].is_empty: del(unassigned[blockindex])
+        if best > new_threshold:
+            assigned_ct += 1
+            assigned_blocks.setdefault(winner, [])
+            assigned_blocks[winner].append(blocks[blockindex])
+            del unassigned[blockindex]
+    print >>sys.stderr, "Done, assigned %d of %d blocks" % (assigned_ct, len(blocks))
+    
 
 polygons = {}
 count = 0
@@ -167,14 +192,65 @@ for origin_id, orphan in orphans:
     if orphan.intersects(polygons[origin_id]):
         polygons[origin_id] = polygons[origin_id].union(orphan)
 
+print >>sys.stderr, "Try to assign the holes to neighboring neighborhoods."
+#merge the nbhds
+city = cascaded_union(polygons.values())
+
+#pull out any holes in the resulting Polygon/Multipolygon
+if type(city) is Polygon:
+    over = [city]
+elif type(city) is MultiPolygon:
+    over = city.geoms
+else:
+    print >>sys.stderr, "\rcity is of type %s, wtf." % (type(city))
+
+holes = []
+for poly in over:
+    holes.extend((Polygon(LinearRing(interior.coords)) for interior in poly.interiors))
+
+count = 0
+total = len(holes)
+retries = 0
+unassigned = None
+while holes:
+    unassigned = []
+    for hole in holes:
+        count += 1
+        changed = False
+        print >>sys.stderr, "\rReassigning %d of %d holes..." % (count-retries, total),
+        for score, place_id in score_block(hole):
+            if place_id not in polygons:
+                # Turns out we just wind up assigning tiny, inappropriate places
+                #nbhds[place_id] = hole
+                #changed = True
+                continue
+            elif hole.intersects(polygons[place_id]):
+                polygons[place_id] = polygons[place_id].union(hole)
+                changed = True
+            if changed:
+                break
+        if not changed:
+            unassigned.append(hole)
+            retries += 1
+    if len(unassigned) == len(holes):
+        # give up
+        break
+    holes = unassigned
+print >>sys.stderr, "%d retried, %d unassigned." % (retries, len(unassigned))
+
 print >>sys.stderr, "Buffering polygons."
 for place_id, polygon in polygons.items():
     if type(polygon) is Polygon:
         polygon = Polygon(polygon.exterior.coords)
     else:
-        polygon = MultiPolygon([Polygon(p.exterior.coords)for p in polygon.geoms])
+        bits = []
+        for p in polygon.geoms:
+            if type(p) is Polygon:
+                bits.append(Polygon(p.exterior.coords))
+        polygon = MultiPolygon(bits)
     polygons[place_id] = polygon.buffer(0)
  
+
 print >>sys.stderr, "Writing output."
 features = []
 for place_id, poly in polygons.items():
