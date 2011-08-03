@@ -1,6 +1,6 @@
 NAME=$1
 WOEID=$2
-DBNAME=osm
+DBNAME=osm # you need to have planet.osm (or some relevant portion) imported
 DBPORT=5433
 #GRASS_LOCATION=/home/sderle/grass/Global/PERMANENT
 GRASS_LOCATION=/mnt/places/melissa/grass/Global/PERMANENT
@@ -20,7 +20,8 @@ BBOX=`python outliers.py data/photos_$WOEID.txt`
 
 if [ ! -r data/blocks_$WOEID.json ]; then
     pgsql2shp -f tmp$WOEID.shp -p $DBPORT $DBNAME \
-     "select osm_id, way from planet_osm_line where way && 'BOX($BBOX)'::box2d and (highway is not null or waterway is not null)"
+     "select osm_id, way from planet_osm_line where way && 'BOX($BBOX)'::box2d and (highway is not null or waterway is not null)" \
+     || exit 1
 
     sed -e "s/WOEID/$WOEID/g" >$GRASS_BATCH_JOB <<End
     v.in.ogr -e --o --v dsn=. layer=tmpWOEID output=blocks_WOEID type=boundary
