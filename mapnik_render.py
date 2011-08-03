@@ -9,6 +9,7 @@ base = "data/results"
 city = sys.argv[1]
 
 woe_id = None
+# intl_cities.txt is a tab-separated file mapping woe_id -> name
 for line in file(base+"/intl_cities.txt"):
     woe_id, name = line.strip().split(None,1)
     if city == name: break
