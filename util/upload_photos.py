@@ -1,9 +1,12 @@
 import Flickr.API
+import os, os.path, json, sys
+import xml.etree.ElementTree
 
-key, secret = os.environ("FLICKR_KEY"), os.environ("FLICKR_SECRET")
+key, secret = os.environ["FLICKR_KEY"], os.environ["FLICKR_SECRET"]
 
 # flickr.test.echo:
 api = Flickr.API.API(key, secret)
+token = None
 
 # flickr.auth.getFrob:
 frob_request = Flickr.API.Request(method='flickr.auth.getFrob')
@@ -25,14 +28,15 @@ if input.lower() not in ('', 'y', 'yes'):
 # flickr.auth.getToken:
 token_rsp = api.execute_request(Flickr.API.Request(method='flickr.auth.getToken', frob=frob, format='json', nojsoncallback=1))
 if token_rsp.code == 200:
-    token_rsp_json = simplejson.load(token_rsp)
+    token_rsp_json = json.load(token_rsp)
     if token_rsp_json['stat'] == 'ok':
         token = str(token_rsp_json['auth']['token']['_content'])
 
 for filename in sys.argv[1:]:
     photo = file(filename, "rb")
     filename = os.path.basename(filename)
-    title = filename.split(".")[0] + " neighborhoods"
-    upload_response = api.execute_upload(filename=filename, args={'auth_token':token, 'title':title, 'photo':photo})
-    print upload_response
+    #upload_response = api.execute_upload(filename=filename, args={'auth_token':token, 'title':title, 'photo':photo})
 
+    upload_request = Flickr.API.Request("http://api.flickr.com/services/upload", auth_token=token, title=filename, photo=photo)
+    upload_response = api.execute_request(upload_request, sign=True, encode=Flickr.API.encode_multipart_formdata)
+    print upload_response
