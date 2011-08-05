@@ -6,7 +6,12 @@ created by Melissa Santos and Schuyler Erle
 What is this?
 -------------
 
-It's the code used by SimpleGeo to generate its neighborhood dataset.
+It's the code used by SimpleGeo to generate its international neighborhood
+dataset.
+
+See the blog post for an explanation:
+
+http://blog.simplegeo.com/2011/08/05/its-a-beautiful-day-in-the-neighborhood/
 
 Why's it here?
 --------------
@@ -21,10 +26,10 @@ How's it work?
 Well, it helps if you download Yahoo's GeoPlanet dump, and load both it and all
 or some subset of Planet.osm into PostGIS.
 
-You'll need to create a data/ directory, and dump a mapping of WoE ID -> Name into
-a file called `data/names.txt`, and another mapping of Parent ID, Name, Type -> WoE ID
-into another file called `data/suburbs.txt`. This is stupid and could be done a lot more
-cleanly.
+You'll need to create a data/ directory, and dump a mapping of WoE ID -> Name
+into a file called `data/names.txt`, and another mapping of Parent ID, Name,
+Type -> WoE ID into another file called `data/suburbs.txt`. This is stupid and
+could be done a lot more cleanly.
 
 Here is a sample of the names.txt we're using:
 
@@ -122,6 +127,7 @@ All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
+
     * Redistributions of source code must retain the above copyright
       notice, this list of conditions and the following disclaimer.
     * Redistributions in binary form must reproduce the above copyright

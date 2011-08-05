@@ -5,6 +5,10 @@
 This archive contains the SimpleGeo International Neighborhoods dataset from 04
 August 2011 in various formats.
 
+See the blog post for more details on the dataset:
+
+http://blog.simplegeo.com/2011/08/05/its-a-beautiful-day-in-the-neighborhood/
+
 -------------
 What's Inside
 -------------
