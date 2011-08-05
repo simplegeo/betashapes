@@ -3,7 +3,7 @@
 from mapnik import *
 import sys, random
 
-width, height = 4096, 4096
+width, height = 2048, 2048
 rgbs = ["80", "a2", "ab"]
 base = "data/results"
 city = sys.argv[1]
@@ -22,7 +22,7 @@ if city == "Tokyo":
     register_fonts("/usr/share/fonts/truetype/takao")
     font = "TakaoMincho Regular"
 else:
-    font = "DejaVu Sans"
+    font = "DejaVu Sans Bold"
 
 def append_style(name, *symbols):
     s = Style()
@@ -49,7 +49,7 @@ m.layers.append(blocks)
 bounds = Layer('bounds', "+proj=latlong +datum=WGS84")
 bounds.datasource = Ogr(base=base,file=city+".json",layer="OGRGeoJSON")
 append_style("bounds", LineSymbolizer(Color('#222222'), 2.0))
-text = TextSymbolizer("name", font, 10, Color("black"))
+text = TextSymbolizer("name", font, 12, Color("black"))
 text.allow_overlap = False
 text.avoid_edges = True
 text.wrap_width = 15
