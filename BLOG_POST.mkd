@@ -1,0 +1,46 @@
+# It's a beautiful day in the neighborhood!
+#####by Schuyler Erle
+######8/5/2012 1:00pm
+######San Francisco, CA
+
+A large part of our job at SimpleGeo consists of listening closely to our users, and trying to understand what kinds of geo-related tools will make their lives easier and their apps more awesome. One thing we hear about pretty regularly is the lack of freely available neighborhood boundaries for international cities.
+
+Now, SimpleGeo Context has had neighborhood boundaries for most major US cities ever since we launched the product. We’ve been asked about neighborhoods in cities outside the US, but, when we started looking, we didn’t immediately find a source that was available under a license that we could encourage you to freely reuse. So we decided to make our own!
+
+We’re pleased to announce the availability in SimpleGeo Context of neighborhood boundaries for the following twelve cities:
+
+* Amsterdam
+* Barcelona
+* Beijing
+* Berlin
+* Florence
+* London
+* Paris
+* Rome
+* Shanghai
+* Sydney
+* Tokyo
+* Vienna
+
+Additionally, we now have approximate boundaries for Paris’s arrondissements and Berlin’s ortsteils. Check out the Eiffel Tower in our Context demo – scroll down to see the map, and click “Features” on the right – or perhaps Westminster Abbey. You can also see some visualizations in [our Flickr stream](http://www.flickr.com/photos/simplegeo/sets/72157627358066594/).
+
+Now, neighborhoods are, in many ways, a unique form of geography. Some geographies are physical by nature: A park has boundaries, a road has a center line, et cetera. Most non-physical geographies have some legal existence, like a post code or a city or a province, where a statute or a treaty defines the boundaries of the geography. As an informal division of a city, a neighborhood’s boundaries are often both invisible and lacking in precise definition. Often, the conventionally accepted boundaries of a neighborhood ebb and flow over time, as the economics or demographics of the region change. Neighborhood boundaries are usually fuzzy, and frequently overlap in practice, in ways that other kinds of geography do not.
+
+So, we’ll be totally candid – our new international neighborhood dataset is definitely a work in progress. There are some evident issues with the new dataset, but we thought it better to release and then iterate, rather than wait indefinitely on impossible perfection. We hope to continue to refine and improve the data, as well as add lots of new cities.
+Due to the data sources we combined to produce them, all of the new neighborhood data in Context is licensed under the [Open Database License (ODbL)](http://opendatacommons.org/licenses/odbl/). You can find the new neighborhoods in SimpleGeo Context, and you can also download the [whole data set](http://s3.amazonaws.com/simplegeo-public/neighborhoods_dump_20110804.zip). We hope you do awesome things with it!
+
+Read on for the technical details!
+
+Generating neighborhood boundaries for new cities actually turned out to be a pretty good trick. We didn’t have any source for boundaries themselves, but Flickr’s body of geotagged photos represent a pool of samples of neighborhood locations, because photos taken in cities often have a machine tag containing the Where On Earth ID (or “WoE ID”) for the corresponding neighborhood. We used the freely available [Yahoo! GeoPlanet data dumps](http://developer.yahoo.com/geo/geoplanet/data/) to identify the WoE IDs of neighborhoods — “Suburb” or “LocalAdmin” in the parlance of GeoPlanet — in the cities in which we were interested. We then used the Flickr API to draw a sample of geotagged photo locations for that WoE ID to establish a kind of “cloud” of points that roughly represent that neighborhood.
+
+At first, we tried generating a [Voronoi diagram](http://en.wikipedia.org/wiki/Voronoi_diagram) over the entire area of the city, and then merging the resulting shapes by WoE ID. This yielded “boundaries” that were very organic, and kind of weird looking. They didn’t correspond to our intuitions about how neighborhoods are structured in the minds of residents and visitors. In our experience, neighborhood boundaries in large cities often conform to the physical geography, such as the lines of roads and waterways, rather than cutting across city blocks, and even buildings.
+
+We turned to [OpenStreetMap](http://openstreetmap.org/) as a source for the physical geography of roads, railroads, and waterways, because OSM turns out to be a pretty good source for this sort of data in most of the world’s largest cities. After loading the [entire world of OSM](http://wiki.openstreetmap.org/wiki/Planet.osm) into a [PostGIS](http://postgis.refractions.net/) database, we take the linework for each city, and, treating it as a set of polygon boundaries, use [GRASS](http://osgeo.org/grass/) to clean up the data and generate a polygon for each “city block” in our area of interest. Using OSM, of course, means that the results need to be licensed ODbL, in order to respect the desire of the community that derivative works be shared alike.
+
+The rest of the work gets done in Python, using the excellent [Shapely](http://trac.gispython.org/lab/wiki/Shapely) library. First, we group the geotagged photo locations by neighborhood, and then filter them by [median absolute deviation](http://en.wikipedia.org/wiki/Median_absolute_deviation) to remove mistagged outliers. Next, we iterate over each city block, and tally up the weighted inverse distances of the n nearest geotagged photos to decide which neighborhood the block “belongs” to. After all the blocks are assigned, we extract the largest polygon for each neighborhood as its “core”, reassign blocks that are detached from their core to other nearby neighborhoods, and do a bit of cleanup. This surprisingly simple local-then-global approach yields pretty convincing results.
+
+We’ve considered two possible improvements for the future. We’ve experimented with an additional step that focuses on swapping blocks at the edges of neighborhoods to improve “compactness”, which intuitively feels like a important property of neighborhood boundaries, and we hope to revisit this soon.
+
+The other possible “improvement” has to do with the fact that, for the time being, the boundaries we’re providing are sharply defined. We felt that this might be easier for developers to work with, versus a set of neighborhood boundaries with variable overlap, but we’d really like your feedback about this works out for you in practice.
+
+You can find the code on Github, if you’re interested: [http://github.com/simplegeo/betashapes/](http://github.com/simplegeo/betashapes/). The name of the code repository is left as an exercise for the reader.
